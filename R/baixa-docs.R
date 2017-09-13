@@ -1,7 +1,9 @@
 
-# @export
-visualize <- function (r) {
-  ct <- r[["headers"]][["content-type"]]
+#' Vizualize web page from httr::GET
+#' @param response Response from an HTTP request
+#' @export
+visualize_page <- function (response) {
+  ct <- response[["headers"]][["content-type"]]
   if (!grepl("html", ct)) {
     stop("Not a HTML file")
   }
@@ -9,7 +11,7 @@ visualize <- function (r) {
     dir <- tempfile()
     dir.create(dir)
     html_file <- file.path(dir, "index.html")
-    h <- httr::content(r, "text")
+    h <- httr::content(response, "text")
     enc <- stringi::stri_enc_detect(h)[[1]]$Encoding[1]
     cat(h, file = html_file)
     rstudioapi::viewer(html_file)

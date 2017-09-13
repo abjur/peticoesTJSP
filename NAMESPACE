@@ -2,4 +2,5 @@
 
 export(download_documents)
 export(login_esaj)
+export(visualize_page)
 importFrom(magrittr,"%>%")

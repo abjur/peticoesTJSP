@@ -3,7 +3,7 @@
 visualize <- function (r) {
   ct <- r[["headers"]][["content-type"]]
   if (!grepl("html", ct)) {
-    stop("Not a HTML file.")
+    stop("Not a HTML file")
   }
   if (interactive()) {
     dir <- tempfile()
@@ -11,59 +11,77 @@ visualize <- function (r) {
     html_file <- file.path(dir, "index.html")
     h <- httr::content(r, "text")
     enc <- stringi::stri_enc_detect(h)[[1]]$Encoding[1]
-    # h <- iconv(h, from = "UTF-8", to = "ISO-8859-1")
     cat(h, file = html_file)
     rstudioapi::viewer(html_file)
   }
 }
 
-# @export
-login_esaj <- function(cpf, pwd) {
-  httr::GET('https://esaj.tjsp.jus.br/esaj/portal.do?servico=740000',
-            httr::config(ssl_verifypeer = FALSE))
-  u <- 'https://esaj.tjsp.jus.br/sajcas/login?service='
-  u2 <- 'https://esaj.tjsp.jus.br/esaj/j_spring_cas_security_check'
-  u <- paste0(u, utils::URLencode(u2, reserved = TRUE))
-  # ssl <- httr::config(ssl_verifypeer = FALSE, maxredirs = 10L)
-  r_inicial <- httr::GET(u, httr::config(ssl_verifypeer = FALSE))
-  lt <- r_inicial %>%
-    httr::content('text') %>%
-    xml2::read_html() %>%
-    rvest::html_node(xpath = '//input[@name="lt"]') %>%
-    rvest::html_attr('value')
-  e2 <- r_inicial %>%
-    httr::content('text') %>%
-    xml2::read_html() %>%
-    rvest::html_node(xpath = '//input[@name="execution"]') %>%
-    rvest::html_attr('value')
-  dados <- list(
-    'username' = cpf,
-    'password' = pwd,
-    'lt' = lt,
-    'execution' = e2,
-    '_eventId' = 'submit',
-    'pbEntrar' = 'Entrar',
-    'signature' = ''
-  )
-  # uu <- 'https://esaj.tjsp.jus.br/sajcas/iniciarHabilitacao.do'
-  r_login <- httr::POST(u, body = dados,
-                        httr::config(ssl_verifypeer = FALSE),
-                        encode = 'form')
-  # visualize(r_login)
-  # logou <- r_login %>%
-  #   httr::content('text') %>%
-  #   detect(stringr::regex('marcelo', ignore_case = TRUE))
-  logou <- httr::GET('https://esaj.tjsp.jus.br/sajcas/verificarLogin.js',
-                     httr::config(ssl_verifypeer = FALSE)) %>%
-    httr::content('text') %>%
-    detect('true')
+#' Log into ESAJ system
+#' @param login ESAJ system login (if left `NULL`, will ask for it)
+#' @param password login ESAJ system login (if left `NULL`, will ask for it)
+#' @export
+login_esaj <- function(login = NULL, password = NULL) {
 
-  if (logou) {
-    cat('Login realizado com sucesso!\n')
-  } else {
-    cat(':(')
+  # Prompt for information if necessary
+  if (is.null(login) || is.null(password)) {
+    login <- as.character(readline(prompt = "Enter your login: "))
+    password <- as.character(readline(prompt = "Enter your password: "))
   }
-  invisible()
+
+  # Initial access
+  base <- "https://esaj.tjsp.jus.br/"
+  httr::GET(str_c(base, "esaj/portal.do?servico=740000"), trt:::vfpr_f)
+
+  # Get login page file
+  f_login <- str_c(
+    base, "sajcas/login?service=",
+    utils::URLencode(
+      str_c(base, "esaj/j_spring_cas_security_check"),
+      reserved = TRUE)) %>%
+    httr::GET(trt:::vfpr_f)
+
+  # Get parameters for POST
+  lt <- f_login %>%
+    httr::content("text") %>%
+    xml2::read_html() %>%
+    xml2::xml_find_first("//input[@name='lt']") %>%
+    rvest::html_attr("value")
+  e2 <- f_login %>%
+    httr::content("text") %>%
+    xml2::read_html() %>%
+    xml2::xml_find_first("//input[@name='execution']") %>%
+    rvest::html_attr("value")
+
+  # Create POST quert
+  query_post <- list(
+    username = login,
+    password = password,
+    lt = lt,
+    execution = e2,
+    "_eventId" = "submit",
+    pbEntrar = "Entrar",
+    signature = "")
+
+  # Try to login
+  str_c(
+    base, "sajcas/login?service=",
+    utils::URLencode(
+      str_c(base, "esaj/j_spring_cas_security_check"),
+      reserved = TRUE)) %>%
+    httr::POST(body = query_post, trt:::vfpr_f, encode = "form")
+
+  # Check if login worked
+  flag <- base %>%
+    str_c("sajcas/verificarLogin.js") %>%
+    httr::GET(trt:::vfpr_f) %>%
+    httr::content("text") %>%
+    detect("true")
+
+  # Message
+  if (flag) { message("You're logged in") }
+  else { message("Login failed") }
+
+  invisible(flag)
 }
 
 #' Download PDF documents belonging to lawsuits
@@ -123,7 +141,7 @@ download_documents <- function(id, path, login = NULL, password = NULL,
 
     # Convert relevant content into JSON
     json <- f_folder %>%
-      httr::content('text') %>%
+      httr::content("text") %>%
       sub_between("requestScope", "requestScopeArvore") %>%
       stringr::str_sub(5, -9) %>%
       jsonlite::fromJSON()

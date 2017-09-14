@@ -21,7 +21,7 @@ download_documents <- function(data, path, login = NULL, password = NULL,
     login_esaj(login, password)
     r_cpopg <- httr::GET(
       "https://esaj.tjsp.jus.br/cpopg/open.do?gateway=true",
-      trt:::vfpr_f)
+      vfpr_f)
   } else {
     data <- get_metadata(data, login, password, only_petitions)
   }
@@ -38,7 +38,7 @@ download_documents <- function(data, path, login = NULL, password = NULL,
       data$file[i], "/", replace_all(data$number[i], "-", "_"),
       "_", data$title[i], ".pdf")
     httr::GET(
-      data$link[i], trt:::vfpr_f,
+      data$link[i], vfpr_f,
       httr::write_disk(data$file[i], TRUE))
   }
 
@@ -65,7 +65,7 @@ get_metadata <- function(id, login = NULL, password = NULL,
 
     # Initial access
     base <- "https://esaj.tjsp.jus.br/cpopg/"
-    r_cpopg <- httr::GET(str_c(base, "open.do?gateway=true"), trt:::vfpr_f)
+    r_cpopg <- httr::GET(str_c(base, "open.do?gateway=true"), vfpr_f)
 
     # Parameters for GET query
     query_get <- list(
@@ -80,7 +80,7 @@ get_metadata <- function(id, login = NULL, password = NULL,
 
     # Get lawsuit code
     lwst_code <- str_c(base, "search.do") %>%
-      httr::GET(query = query_get, trt:::vfpr_f) %>%
+      httr::GET(query = query_get, vfpr_f) %>%
       purrr::pluck("all_headers", 1, "headers", "location") %>%
       stringr::str_match("processo\\.codigo=([^&]+)&") %>%
       magrittr::extract(1, 2)
@@ -88,9 +88,9 @@ get_metadata <- function(id, login = NULL, password = NULL,
     # Get page with all PDFs
     f_folder <- base %>%
       str_c("abrirPastaDigital.do?processo.codigo=", lwst_code) %>%
-      httr::GET(trt:::vfpr_f) %>%
+      httr::GET(vfpr_f) %>%
       purrr::pluck("all_headers", 1, "headers", "location") %>%
-      httr::GET(trt:::vfpr_f)
+      httr::GET(vfpr_f)
 
     # Convert relevant content into JSON
     json <- f_folder %>%

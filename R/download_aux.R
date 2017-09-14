@@ -16,7 +16,7 @@ login_esaj <- function(login = NULL, password = NULL) {
 
   # Initial access
   base <- "https://esaj.tjsp.jus.br/"
-  httr::GET(str_c(base, "esaj/portal.do?servico=740000"), trt:::vfpr_f)
+  httr::GET(str_c(base, "esaj/portal.do?servico=740000"), vfpr_f)
 
   # Get login page file
   f_login <- str_c(
@@ -24,7 +24,7 @@ login_esaj <- function(login = NULL, password = NULL) {
     utils::URLencode(
       str_c(base, "esaj/j_spring_cas_security_check"),
       reserved = TRUE)) %>%
-    httr::GET(trt:::vfpr_f)
+    httr::GET(vfpr_f)
 
   # Get parameters for POST
   lt <- f_login %>%
@@ -54,7 +54,7 @@ login_esaj <- function(login = NULL, password = NULL) {
     utils::URLencode(
       str_c(base, "esaj/j_spring_cas_security_check"),
       reserved = TRUE)) %>%
-    httr::POST(body = query_post, trt:::vfpr_f, encode = "form")
+    httr::POST(body = query_post, vfpr_f, encode = "form")
 
   # Message
   flag <- check_login()
@@ -68,7 +68,7 @@ login_esaj <- function(login = NULL, password = NULL) {
 check_login <- function() {
   flag <- "https://esaj.tjsp.jus.br/" %>%
     str_c("sajcas/verificarLogin.js") %>%
-    httr::GET(trt:::vfpr_f) %>%
+    httr::GET(vfpr_f) %>%
     httr::content("text") %>%
     detect("true")
 }

@@ -24,6 +24,9 @@ sub_between <- function(string, pattern1, pattern2) {
     stringr::str_locate(., pattern2)[, 1])
 }
 
+# Shortcut for config
+vfpr_f <- httr::config(ssl_verifypeer = FALSE)
+
 # Shortcuts for stringr functions
 str_c <- stringr::str_c
 replace_all <- stringr::str_replace_all

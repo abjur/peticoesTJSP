@@ -31,4 +31,4 @@ detect <- stringr::str_detect
 
 globalVariables(c(
   "all_headers", "headers", "lead", "link", "location",
-  "n_processo", "number", "rowname", "title", "."))
+  "n_processo", "number", "rowname", "title", ".", "id"))

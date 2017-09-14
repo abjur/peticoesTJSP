@@ -1,17 +1,67 @@
 
-#' Download PDF documents belonging to lawsuits
-#' @param id A character vector with one or more lawsuit IDs
+#' @title Download PDF documents belonging to lawsuits
+#' @description This function accesses lawsuits' ESAJ pages and
+#' tries to download documents (if IDs are provided to `data`
+#' and a lawsuit isn't found, shows error but skips it).
+#' @param data A character vector with one or more lawsuit IDs or
+#' the tibble returned by [get_metadata()]
 #' @param path Path to directory where to save files
-#' @param login ESAJ system login (if left `NULL`, will ask for it)
-#' @param password ESAJ system password (if left `NULL`, will ask for it)
+#' @param login ESAJ system login (if left `NULL` and your're
+#' not logged in yet, will ask for it)
+#' @param password ESAJ system password (if left `NULL` and your're
+#' not logged in yet, will ask for it)
 #' @param only_petitions Whether to only download petitions
-#' @param verbose Whether to output messages while downloading
+#' @seealso [get_metadata()]
 #' @export
-download_documents <- function(id, path, login = NULL, password = NULL,
-                               only_petitions = FALSE, verbose = FALSE) {
+download_documents <- function(data, path, login = NULL, password = NULL,
+                               only_petitions = FALSE) {
 
-  # Download documents belonging to a lawsuit
-  download_ <- function(id) {
+  # Depending on data's type, get ready for download
+  if (dplyr::is.tbl(data)) {
+    login_esaj(login, password)
+    r_cpopg <- httr::GET(
+      "https://esaj.tjsp.jus.br/cpopg/open.do?gateway=true",
+      trt:::vfpr_f)
+  } else {
+    data <- get_metadata(data, login, password, only_petitions)
+  }
+
+  # Create directories if necessary
+  data <- dplyr::mutate(data, file = str_c(
+    normalizePath(path), "/",
+    replace_all(id, "[\\.\\-]", "")))
+  purrr::walk(data$file, dir.create, FALSE, TRUE)
+
+  # Download documents
+  for (i in seq_along(data$title)) {
+    data$file[i] <- str_c(
+      data$file[i], "/", replace_all(data$number[i], "-", "_"),
+      "_", data$title[i], ".pdf")
+    httr::GET(
+      data$link[i], trt:::vfpr_f,
+      httr::write_disk(data$file[i], TRUE))
+  }
+
+  invisible(data)
+}
+
+#' @title Get metadata from documents belonging to lawsuits
+#' @description This function accesses lawsuits' ESAJ pages and
+#' tries to get the metadata of all documents (if lawsuit
+#' isn't found, shows error but skips it).
+#' @param id A character vector with one or more lawsuit IDs
+#' @param login ESAJ system login (if left `NULL` and your're
+#' not logged in yet, will ask for it)
+#' @param password ESAJ system password (if left `NULL` and your're
+#' not logged in yet, will ask for it)
+#' @param only_petitions Whether to only get petitions
+#' @seealso [download_documents()]
+#' @export
+get_metadata <- function(id, login = NULL, password = NULL,
+                         only_petitions = FALSE) {
+
+  # Get metadata for one ID
+  get_metadata_ <- function(id) {
 
     # Initial access
     base <- "https://esaj.tjsp.jus.br/cpopg/"
@@ -35,24 +85,12 @@ download_documents <- function(id, path, login = NULL, password = NULL,
       stringr::str_match("processo\\.codigo=([^&]+)&") %>%
       magrittr::extract(1, 2)
 
-    # Message
-    if (verbose) { message("Fetched lawsuit code") }
-
     # Get page with all PDFs
     f_folder <- base %>%
       str_c("abrirPastaDigital.do?processo.codigo=", lwst_code) %>%
       httr::GET(trt:::vfpr_f) %>%
       purrr::pluck("all_headers", 1, "headers", "location") %>%
       httr::GET(trt:::vfpr_f)
-
-    # Message
-    if (verbose) { message("Fetched links to PDFs") }
-
-    # Create directory if necessary
-    path <- str_c(
-      normalizePath(path), "/",
-      replace_all(id, "[\\.\\-]", ""))
-    dir.create(path, FALSE, TRUE)
 
     # Convert relevant content into JSON
     json <- f_folder %>%
@@ -90,33 +128,23 @@ download_documents <- function(id, path, login = NULL, password = NULL,
         id = id,
         number = number %>%
           sprintf('%03d-%03d', ., dplyr::lead(.)-1) %>%
-          gsub(' NA', 'inf', .)) %>%
+          gsub('0NA', 'inf', .)) %>%
       dplyr::select(title, number, id, link) %>%
       dplyr::arrange(number)
 
     # Filter columns if necessary
     docs <-
-    if (only_petitions) {
-      dplyr::filter(docs, detect(title, 'peticao|ajuizamento|contestacao'))
-    } else { docs }
-
-    # Message
-    if (verbose) { message("Downloading documents") }
-
-    # Download documents
-    for (i in seq_along(docs$title)) {
-      file <- str_c(
-        path, "/", replace_all(docs$number[i], "-", "_"),
-        "_", docs$title[i], ".pdf")
-      httr::GET(docs$link[i], trt:::vfpr_f, httr::write_disk(file, TRUE))
-    }
+      if (only_petitions) {
+        dplyr::filter(docs, detect(title, 'peticao|ajuizamento|contestacao'))
+      } else { docs }
 
     return(docs)
   }
+  get_metadata_ <- purrr::safely(get_metadata_, dplyr::tibble(), FALSE)
 
   # Login to ESAJ system
   login_esaj(login, password)
 
   # Map download over all IDs
-  purrr::map_dfr(id, download_)
+  purrr::map_dfr(id, ~get_metadata_(.x)$result)
 }

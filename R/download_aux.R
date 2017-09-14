@@ -5,6 +5,9 @@
 #' @export
 login_esaj <- function(login = NULL, password = NULL) {
 
+  # Check if isn't already logged in
+  if (check_login()) { return(TRUE) }
+
   # Prompt for information if necessary
   if (is.null(login) || is.null(password)) {
     login <- as.character(readline(prompt = "Enter your login: "))
@@ -53,18 +56,21 @@ login_esaj <- function(login = NULL, password = NULL) {
       reserved = TRUE)) %>%
     httr::POST(body = query_post, trt:::vfpr_f, encode = "form")
 
-  # Check if login worked
-  flag <- base %>%
+  # Message
+  flag <- check_login()
+  if (flag) { message("You're logged in") }
+  else { message("Login failed") }
+
+  return(flag)
+}
+
+# Check if user is logged into ESAJ
+check_login <- function() {
+  flag <- "https://esaj.tjsp.jus.br/" %>%
     str_c("sajcas/verificarLogin.js") %>%
     httr::GET(trt:::vfpr_f) %>%
     httr::content("text") %>%
     detect("true")
-
-  # Message
-  if (flag) { message("You're logged in") }
-  else { message("Login failed") }
-
-  invisible(flag)
 }
 
 #' Vizualize web page from httr::GET

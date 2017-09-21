@@ -18,7 +18,8 @@ Imports:
   tibble,
   tidyr,
   xml2,
-  purrr
+  purrr,
+  progress
 Remotes:
   courtsbr/trt,
   courtsbr/esaj,

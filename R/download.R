@@ -4,17 +4,18 @@
 #' tries to download documents (if IDs are provided to `data`
 #' and a lawsuit isn't found, shows error but skips it).
 #' @param data A character vector with one or more lawsuit IDs or
-#' the tibble returned by [get_metadata()]
+#' the tibble returned by [get_metadata()] (can be filtered)
 #' @param path Path to directory where to save files
 #' @param login ESAJ system login (if left `NULL` and your're
 #' not logged in yet, will ask for it)
 #' @param password ESAJ system password (if left `NULL` and your're
 #' not logged in yet, will ask for it)
 #' @param only_petitions Whether to only download petitions
+#' @param progress Whether to show a progress bar
 #' @seealso [get_metadata()]
 #' @export
 download_documents <- function(data, path, login = NULL, password = NULL,
-                               only_petitions = FALSE) {
+                               only_petitions = FALSE, progress = FALSE) {
 
   # Depending on data's type, get ready for download
   if (dplyr::is.tbl(data)) {
@@ -23,6 +24,7 @@ download_documents <- function(data, path, login = NULL, password = NULL,
       "https://esaj.tjsp.jus.br/cpopg/open.do?gateway=true",
       vfpr_f)
   } else {
+    if (progress) { message("Fetching metadata...") }
     data <- get_metadata(data, login, password, only_petitions)
   }
 
@@ -32,14 +34,25 @@ download_documents <- function(data, path, login = NULL, password = NULL,
     replace_all(id, "[\\.\\-]", "")))
   purrr::walk(data$file, dir.create, FALSE, TRUE)
 
+  # Setup progress bar
+  if (progress) {
+    message("Downloading documents...")
+    pb <- progress::progress_bar$new(total = nrow(data))
+  }
+
   # Download documents
   for (i in seq_along(data$title)) {
+
+    # Download a document
     data$file[i] <- str_c(
       data$file[i], "/", replace_all(data$number[i], "-", "_"),
       "_", data$title[i], ".pdf")
     httr::GET(
       data$link[i], vfpr_f,
       httr::write_disk(data$file[i], TRUE))
+
+    # Tick progress bar
+    if (progress) { pb$tick() }
   }
 
   invisible(data)

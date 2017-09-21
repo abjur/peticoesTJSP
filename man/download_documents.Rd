@@ -5,11 +5,11 @@
 \title{Download PDF documents belonging to lawsuits}
 \usage{
 download_documents(data, path, login = NULL, password = NULL,
-  only_petitions = FALSE)
+  only_petitions = FALSE, progress = FALSE)
 }
 \arguments{
 \item{data}{A character vector with one or more lawsuit IDs or
-the tibble returned by [get_metadata()]}
+the tibble returned by [get_metadata()] (can be filtered)}
 
 \item{path}{Path to directory where to save files}
 
@@ -20,6 +20,8 @@ not logged in yet, will ask for it)}
 not logged in yet, will ask for it)}
 
 \item{only_petitions}{Whether to only download petitions}
+
+\item{progress}{Whether to show a progress bar}
 }
 \description{
 This function accesses lawsuits' ESAJ pages and

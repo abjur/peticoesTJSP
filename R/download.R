@@ -19,10 +19,7 @@ download_documents <- function(data, path, login = NULL, password = NULL,
 
   # Depending on data's type, get ready for download
   if (dplyr::is.tbl(data)) {
-    login_esaj(login, password)
-    r_cpopg <- httr::GET(
-      "https://esaj.tjsp.jus.br/cpopg/open.do?gateway=true",
-      vfpr_f)
+    get_metadata(unique(data$id), login, password, only_petitions)
   } else {
     if (progress) { message("Fetching metadata...") }
     data <- get_metadata(data, login, password, only_petitions)

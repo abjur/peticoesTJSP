@@ -22,36 +22,37 @@ download_documents <- function(data, path, login = NULL, password = NULL,
     get_metadata(unique(data$id), login, password, only_petitions)
   } else {
     if (progress) { message("Fetching metadata...") }
-    data <- get_metadata(data, login, password, only_petitions)
+    data <- get_metadata(data, path, login, password, only_petitions)
   }
 
-  # Create directories if necessary
-  data <- dplyr::mutate(data, file = str_c(
-    normalizePath(path), "/",
-    replace_all(id, "[\\.\\-]", "")))
-  purrr::walk(data$file, dir.create, FALSE, TRUE)
+  if (nrow(data) > 0) {
+    # Create directories if necessary
+    data <- dplyr::mutate(data, file = str_c(
+      normalizePath(path), "/",
+      replace_all(id, "[\\.\\-]", "")))
+    purrr::walk(data$file, dir.create, FALSE, TRUE)
 
-  # Setup progress bar
-  if (progress) {
-    message("Downloading documents...")
-    pb <- progress::progress_bar$new(total = nrow(data))
+    # Setup progress bar
+    if (progress) {
+      message("Downloading documents...")
+      pb <- progress::progress_bar$new(total = nrow(data))
+    }
+
+    # Download documents
+    for (i in seq_along(data$title)) {
+
+      # Download a document
+      data$file[i] <- str_c(
+        data$file[i], "/", replace_all(data$number[i], "-", "_"),
+        "_", data$title[i], ".pdf")
+      httr::GET(
+        data$link[i], vfpr_f,
+        httr::write_disk(data$file[i], TRUE))
+
+      # Tick progress bar
+      if (progress) { pb$tick() }
+    }
   }
-
-  # Download documents
-  for (i in seq_along(data$title)) {
-
-    # Download a document
-    data$file[i] <- str_c(
-      data$file[i], "/", replace_all(data$number[i], "-", "_"),
-      "_", data$title[i], ".pdf")
-    httr::GET(
-      data$link[i], vfpr_f,
-      httr::write_disk(data$file[i], TRUE))
-
-    # Tick progress bar
-    if (progress) { pb$tick() }
-  }
-
   invisible(data)
 }
 
@@ -67,9 +68,14 @@ download_documents <- function(data, path, login = NULL, password = NULL,
 #' @param only_petitions Whether to only get petitions
 #' @seealso [download_documents()]
 #' @export
-get_metadata <- function(id, login = NULL, password = NULL,
+get_metadata <- function(id, path = ".", login = NULL, password = NULL,
                          only_petitions = FALSE) {
 
+  id <- abjutils::clean_cnj(id)
+  f <- sprintf("%s/%s", path, id)
+  fs::dir_create(f)
+  html_file <- sprintf("%s/%s.html", f, id)
+  rds_file <- sprintf("%s/%s.rds", f, id)
   # Get metadata for one ID
   get_metadata_ <- function(id) {
 
@@ -90,7 +96,8 @@ get_metadata <- function(id, login = NULL, password = NULL,
 
     # Get lawsuit code
     lwst_code <- str_c(base, "search.do") %>%
-      httr::GET(query = query_get, vfpr_f) %>%
+      httr::GET(query = query_get, vfpr_f,
+                httr::write_disk(html_file, overwrite = TRUE)) %>%
       purrr::pluck("all_headers", 1, "headers", "location") %>%
       stringr::str_match("processo\\.codigo=([^&]+)&") %>%
       magrittr::extract(1, 2)
@@ -142,6 +149,8 @@ get_metadata <- function(id, login = NULL, password = NULL,
       dplyr::select(title, number, id, link) %>%
       dplyr::arrange(number)
 
+    readr::write_rds(docs, rds_file)
+
     # Filter columns if necessary
     docs <-
       if (only_petitions) {
@@ -158,3 +167,4 @@ get_metadata <- function(id, login = NULL, password = NULL,
   # Map download over all IDs
   purrr::map_dfr(id, ~get_metadata_(.x)$result)
 }
+

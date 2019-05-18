@@ -21,7 +21,6 @@ Imports:
   purrr,
   progress
 Remotes:
-  courtsbr/trt,
   courtsbr/esaj,
   abjur/abjutils
 License: MIT + file LICENSE
